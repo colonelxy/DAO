@@ -90,4 +90,15 @@ contract CryptoDevDAO is Ownable {
         require(proposals[proposalIndex].executed == false, 'Proposal already executed');
         _;
     }
+
+    function executeProposal(uint256 proposalIndex) external nftHolderOnly inactiveProposalOnly(proposalIndex) {
+        Proposal storage proposal = proposals[proposalIndex];
+    }
+
+    if (proposal.yayVotes > proposal.nayVotes) {
+        uint256 nftPrice = nftMarketplace.getPrice();
+        require(address(this).balance >= nftPrice, 'Not enough funds boss');
+        nftMarketplace.purchase{value: nftPrice}(proposal.nftTokenId);
+    }
+    proposal.executed = true;
 }
