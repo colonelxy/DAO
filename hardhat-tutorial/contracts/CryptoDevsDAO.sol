@@ -4,8 +4,7 @@ pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 
-contract CryptoDevDAO is Ownable {
-    interface IFakeNFTMarketplace {
+interface IFakeNFTMarketplace {
         function getPrice() external view returns (uint256);
 
         function available(uint256 _tokenId) external view returns (bool);
@@ -13,11 +12,16 @@ contract CryptoDevDAO is Ownable {
         function purchase(uint256 _tokenId) external payable;
     }
 
-    interface ICryptoDevsNFT {
-        function balanceOf(address owner) external view returns (uint256);
+interface ICryptoDevsNFT {
+    function balanceOf(address owner) external view returns (uint256);
 
-        function tokenOfOwnerByIndex(address owner, uint256 index) external view returns (uint256);
-    }
+    function tokenOfOwnerByIndex(address owner, uint256 index) external view returns (uint256);
+}
+
+contract CryptoDevsDAO is Ownable {
+    IFakeNFTMarketplace nftMarketplace;
+    ICryptoDevsNFT cryptoDevsNFT;
+    
 
     struct Proposal {
         uint256 nftTokenId;
@@ -26,12 +30,12 @@ contract CryptoDevDAO is Ownable {
         uint256 nayVotes;
         bool executed;
         mapping(uint256 => bool) voters;
-        mapping(uint256 => Proposal) public proposals;
-        uint256 public numProposals;
     }
 
-    IFakeNFTMarketplace nftMarketplace;
-    ICryptoDevsNFT cryptoDevsNFT;
+    mapping(uint256 => Proposal) public proposals;
+    uint256 public numProposals;
+
+    
 
     constructor(address _nftMarketplace, address _cryptoDevsNFT) payable {
         nftMarketplace = IFakeNFTMarketplace(_nftMarketplace);
@@ -53,10 +57,10 @@ contract CryptoDevDAO is Ownable {
         return numProposals - 1;
     }
 
-    modifier activeProposalOnly(uint256 proposalIndex) (
+    modifier activeProposalOnly(uint256 proposalIndex) {
         require( proposals[proposalIndex].deadline > block.timestamp, "Deadline has lapsed");
         _;
-    )
+    }
 
     enum Vote {
         YAY,
@@ -65,14 +69,16 @@ contract CryptoDevDAO is Ownable {
 
     function voteOnProposal(uint256 proposalIndex, Vote vote) external nftHolderOnly activeProposalOnly(proposalIndex) {
         Proposal storage proposal = proposals[proposalIndex];
+
         uint256 voterNFTBalance = cryptoDevsNFT.balanceOf(msg.sender);
         uint256 numVotes;
 
-        for (uint256 1; i < voterNFTBalance; i++) {
+        for (uint256 i; i < voterNFTBalance; i++) {
+            // console.log(cryptoDevsNFT.tokenOfOwnerByIndex(msg.sender, i));
             uint256 tokenId = cryptoDevsNFT.tokenOfOwnerByIndex(msg.sender, i);
             if (proposal.voters[tokenId] ==false) {
                 numVotes++;
-                proposal.votes[tokenId] = true;
+                proposal.voters[tokenId] = true;
             }
         }
         require(numVotes > 0, 'Already voted');
@@ -93,12 +99,24 @@ contract CryptoDevDAO is Ownable {
 
     function executeProposal(uint256 proposalIndex) external nftHolderOnly inactiveProposalOnly(proposalIndex) {
         Proposal storage proposal = proposals[proposalIndex];
-    }
 
-    if (proposal.yayVotes > proposal.nayVotes) {
+        if (proposal.yayVotes > proposal.nayVotes) {
         uint256 nftPrice = nftMarketplace.getPrice();
         require(address(this).balance >= nftPrice, 'Not enough funds boss');
         nftMarketplace.purchase{value: nftPrice}(proposal.nftTokenId);
     }
     proposal.executed = true;
+
+    }
+    
+
+    function withdrawEther() external onlyOwner {
+        uint256 amount = address(this).balance;
+        require(amount >0, "Nothing to withdraw, contract balance is empty");
+        payable(owner()).transfer(amount);
+    }
+
+    receive() external payable {}
+
+    fallback() external payable {}
 }
