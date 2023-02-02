@@ -164,13 +164,88 @@ const voteOnProposal = async(proposalId, _vote) => {
     await txn.wait();
     setLoading(false);
     await fetchAllProposals();
+  } catch (e) {
+    console.error(e);
+    window.alert(e.reason);
+  }
+};
 
+const executeProposal = async (proposalId) {
+  try {
+    const signer = await getProviderOrSigner(true);
+    const daoContract = getDaoContractInstance(signer);
+    const tx = await daoContract.executeProposal(proposalId);
+    setLoading(true);
+    await tx.wait();
+    setLoading(false);
+    await fetchAllProposals();
+    getDAOTreasuryBalance();
 
   } catch (e) {
     console.error(e);
     window.alert(e.reason);
   }
 };
+
+const getProviderOrSigner = async (needSigner = false) => {
+  const provider = await web3ModalRef.current.connect();
+  const web3Provider = new providers.Web3Provider(provider);
+
+  const {chainId} = await web3Provider.getNetwork();
+  if(chainId !==5) {
+    window.alert("Please switch to Goerli network");
+    throw new Error("Please switch to the Goerli network");
+  }
+
+  if (needSigner) {
+    const signer = web3Provider.getSigner();
+    return signer;
+  }
+  return web3Provider;
+};
+
+const getDaoContractInstance = (providerOrSigner) => {
+  return new Contract(
+    DAO_CONTRACT_ADDRESS,
+    DAO_ABI,
+    providerOrSigner
+  );
+};
+
+const getCryptodevsNFTContractInstance = (providerOrSigner) {
+  return new Contract(
+    NFT_CONTRACT_ADRRESS,
+    NFT_ABI,
+    providerOrSigner
+  );
+};
+
+useEffect(() => {
+  if (!wallectConnected) {
+    web3ModalRef.current = new Web3Modal({
+      network: "goerli",
+      providerOptions: {},
+      disableInjectedProvider:false,
+    });
+
+    connectWallet()
+    .then(() => {
+      getDAOTreasuryBalance();
+      getUserNFTBalance();
+      getNumProposalsInDAO();
+      getDAOOwner();
+    });
+  }
+}, [wallectConnected]);
+
+
+useEffect(() => {
+  id(selectedTab === "View Proposals") {
+    fetchAllProposals();
+  }
+}, [selectedTab]);
+
+
 
   return (
     
