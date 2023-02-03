@@ -1,7 +1,5 @@
 import Head from 'next/head'
 import {Contract, providers } from 'ethers'
-import Image from 'next/image'
-import { Inter } from '@next/font/google'
 import styles from '@/styles/Home.module.css'
 import {useEffect, useRef, useState} from 'react'
 import Web3Modal from 'web3modal'
@@ -21,15 +19,17 @@ const [treasuryBalance, setTreasuryBalance] = useState("0");
 const [numProposals, setNumProposals] = useState("0");
 const [proposals, setProposals] = useState([]);
 const [ nftBalance, setNftBalance] = useState(0);
-const [ faleNftTokenId, setFakeNftTokenId]= useState("");
+const [ fakeNftTokenId, setFakeNftTokenId]= useState("");
 const [ selectedTab, setSelectedTab] = useState("");
 const [loading, setLoading] = useState(false);
 const [wallectConnected, setWalletConnected] = useState(false);
 const [isOwner, setIsOwner] = useState(false);
 const web3ModalRef = useRef();
 
-const connectWallet = async()=> {
-  try{
+
+
+const connectWallet = async () => {
+  try {
     await getProviderOrSigner();
     setWalletConnected(true);
 
@@ -72,7 +72,7 @@ const withdrawDAOEther = async () => {
   };
 };
 
-const getDAOTreasuryBalance = async ()=> {
+const getDAOTreasuryBalance = async () => {
   try {
     const provider = await getProviderOrSigner();
     const balance = await provider.getBalance(
@@ -101,7 +101,7 @@ const getUserNFTBalance = async() => {
   try {
     const signer = await getProviderOrSigner(true);
     const nftContract = getCryptodevsNFTContractInstance(signer);
-    const balance = await nftContract.balanceOf(signer.getAddress);
+    const balance = await nftContract.balanceOf(signer.getAddress());
     setNftBalance(parseInt(balance.toString()));
 
   } catch (e) {
@@ -111,10 +111,17 @@ const getUserNFTBalance = async() => {
 
 const createProposal = async() => {
   try {
+    const signer = await getProviderOrSigner(true);
+    const daoContract=getDaoContractInstance(signer);
+    const tx=await daoContract.createProposal(fakeNftTokenId);
+    setLoading(true);
+    await tx.wait();
+    await getNumProposalsInDAO();
+    setLoading(false);
 
   } catch (e) {
     console.error(e);
-    window.alert(e.reason);
+    window.alert(e.data.message);
   }
 };
 
@@ -252,13 +259,13 @@ function renderTabs() {
     return renderViewProposalTab();
   }
   return null;
-};
+}
 
 function renderCreateProposalTab() {
   if (loading) {
     return (
       <div className={styles.description}>
-        Loading ... Waiting for transaction...
+        Loading ... Creating proposal...
       </div>
     );
   } else if (nftBalance === 0) {
@@ -286,55 +293,61 @@ function renderCreateProposalTab() {
 }
 
 function renderViewProposalTab() {
-  if (loading) {
-    return (
-      <div className={styles.description}>
-        Loading... Waiting for transaction...
-      </div>
-    );
-  } else if (proposal.length ===0) {
-    return (
-      <div className={styles.description}>
-        No proposals have been created
-      </div>
-    );
-  } else {
-    return (
-      <div>
-        {proposals.map((p, index) => (
-          <div key={index} className={styles.proposalCard}>
-            <p>Proposal ID: {p.proposalId}</p>
-            <p>Fake NFT to Purchase: {p.nftTokenId}</p>
-            <p>Deadline: {p.deadline.toLocaleString()}</p>
-            <p>Yay Votes: {p.yayVotes}</p>
-            <p>Nay Votes: {p.nayVotes}</p>
-            <p>Executed?: {p.executed.toString()}</p>
-            {p.deadline.getTime() > Date.now() && !p.executed? (
-              <div className={styles.flex}>
-                <button className={styles.button2} onClick={() => voteOnProposal(p.proposalId, "YAY")}>
-                  Vote YAY
-                </button>
-                <button className={styles.button2} onClick={() => voteOnProposal(p.proposalId, "NAY")}>
-                  Vote NAY
-                </button>
-              </div>
-            ) : p.deadline.getTime() < Date.now() && !p.executed? (
-              <div className={styles.flex}>
-                <button className={styles.button2} onClick={() => executeProposal(p.proposalId)}>
-                  Execute Proposal{" "}
-                  {p.yayVotes > p.nayVotes ? "(YAY)" : "(NAY)"}
-                </button>
-              </div>
-            ) : (
-              <div className={styles.description}>Proposal Executed!</div>
-            )}
-
-          </div>
+    if (loading) {
+      return (
+        <div className={styles.description}>
+          Loading... Waiting for transaction...
+        </div>
+      );
+    } else if (proposals.length === 0) {
+      return (
+        <div className={styles.description}>No proposals have been created</div>
+      );
+    } else {
+      return (
+        <div>
+          {proposals.map((p, index) => (
+            <div key={index} className={styles.proposalCard}>
+              <p>Proposal ID: {p.proposalId}</p>
+              <p>Fake NFT to Purchase: {p.nftTokenId}</p>
+              <p>Deadline: {p.deadline.toLocaleString()}</p>
+              <p>Yay Votes: {p.yayVotes}</p>
+              <p>Nay Votes: {p.nayVotes}</p>
+              <p>Executed?: {p.executed.toString()}</p>
+              {p.deadline.getTime() > Date.now() && !p.executed ? (
+                <div className={styles.flex}>
+                  <button
+                    className={styles.button2}
+                    onClick={() => voteOnProposal(p.proposalId, "YAY")}
+                  >
+                    Vote YAY
+                  </button>
+                  <button
+                    className={styles.button2}
+                    onClick={() => voteOnProposal(p.proposalId, "NAY")}
+                  >
+                    Vote NAY
+                  </button>
+                </div>
+              ) : p.deadline.getTime() < Date.now() && !p.executed ? (
+                <div className={styles.flex}>
+                  <button
+                    className={styles.button2}
+                    onClick={() => executeProposal(p.proposalId)}
+                  >
+                    Execute Proposal{" "}
+                    {p.yayVotes > p.nayVotes ? "(YAY)" : "(NAY)"}
+                  </button>
+                </div>
+              ) : (
+                <div className={styles.description}>Proposal Executed</div>
+              )}
+            </div>
           ))}
-      </div>
-    );
+        </div>
+      );
+    }
   }
-}
 
   return (
     <div>
@@ -358,7 +371,7 @@ function renderViewProposalTab() {
           </div>
           <div className={styles.flex}>
             <button className={styles.button} onClick={() => setSelectedTab("Create Proposal")}> Create Proposal</button>
-            <button className={styles.button} onClick={() => setSelectedTab("view Proposals")}>View Proposals</button>
+            <button className={styles.button} onClick={() => setSelectedTab("View Proposals")}>View Proposals</button>
           </div>
           {renderTabs()}
           {isOwner? (
